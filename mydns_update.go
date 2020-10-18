@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"net/smtp"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -12,20 +11,23 @@ import (
 )
 
 func ticker(ctx context.Context) error {
-	t := time.NewTicker(3600 * 12 * time.Second) //1秒周期の ticker
+	var ipaddr string
+	ipaddr = "0.0.0.0"
+	t := time.NewTicker(30 * time.Second) //1秒周期の ticker
 	defer t.Stop()
 
 	for {
 		select {
 		case now := <-t.C:
-			fmt.Println("IPaddr update")
-			fmt.Println(now.Format(time.RFC3339))
-			cmd := exec.Command("./update.sh")
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-			err := cmd.Run()
+			out, err := exec.Command("curl", "inet-ip.info").Output()
+			tmp := string(out)
+			fmt.Println(now.Format(time.RFC3339) + "\n" + tmp)
+			if ipaddr != tmp {
+				ipaddr = tmp
+				ipupdater(ipaddr)
+			}
 			if err != nil {
-				sendmail("error by mydns_update", "mydnsのIP更新が止まった")
+				sendmail("error by mydns_update", "なんかipが取得できなかった")
 				panic(err)
 			}
 
@@ -33,6 +35,19 @@ func ticker(ctx context.Context) error {
 			fmt.Println("Stop child")
 			return ctx.Err()
 		}
+	}
+}
+
+func ipupdater(addr string) {
+	fmt.Println("new ip address: " + addr)
+	cmd := exec.Command("./update.sh")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	sendmail("ipアドレスの変更を検知", "ipが変わった。\nnew ip: "+addr)
+	err := cmd.Run()
+	if err != nil {
+		sendmail("error by mydns_update", "更新中にエラー吐いた")
+		panic(err)
 	}
 }
 
@@ -83,27 +98,8 @@ func Run(ctx context.Context) error {
 	return err
 }
 
-func sendmail(subject, message string) error {
-	mailaddr := os.Getenv("GMAIL_MAIN")
-	pwd := os.Getenv("GMAIL_MAIN_PW")
-	auth := smtp.PlainAuth(
-		"",
-		mailaddr,
-		pwd,
-		"smtp.gmail.com",
-	)
-
-	return smtp.SendMail(
-		"smtp.gmail.com:587",
-		auth,
-		mailaddr,           // 送信元
-		[]string{mailaddr}, // 送信先
-		[]byte(
-			"To: "+mailaddr+"\r\n"+
-				"Subject:"+subject+"\r\n"+
-				"\r\n"+
-				message),
-	)
+func sendmail(subject, message string) {
+	//あとでつくる
 }
 
 func main() {
