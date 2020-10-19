@@ -13,7 +13,7 @@ import (
 func ticker(ctx context.Context) error {
 	var ipaddr string
 	ipaddr = "0.0.0.0"
-	t := time.NewTicker(30 * time.Second) //1秒周期の ticker
+	t := time.NewTicker(1 * time.Second) //1秒周期の ticker
 	defer t.Stop()
 
 	for {
@@ -88,7 +88,7 @@ func Run(ctx context.Context) error {
 
 	parent := SignalContext(ctx)
 	go func() {
-		child, cancelChild := context.WithTimeout(parent, 36000*time.Second)
+		child, cancelChild := context.WithTimeout(parent, 3600*24*365*10*time.Second)
 		defer cancelChild()
 		errCh <- ticker(child)
 	}()
